@@ -1,9 +1,45 @@
-#set heading(numbering: "1.1")
-#set page(margin: 2cm)
+#set page(
+  paper: "us-letter",
+  margin: (x:2.8cm, y:2.6cm),
+  header: align(right)[
+    TOC and LSTM Based Resource Scheduling
+  ], 
+  numbering: "1"
+)
+#set text(
+  font: "New Computer Modern",
+  size: 12pt
+)
+#set par(
+  justify: true,
+  leading: 0.52em
+)
+#set heading(
+  numbering:"1.1" 
+)
+#align(center, text(17pt)[
+  *TOC and LSTM Based Resource Scheduling*
+])
+#grid(
+  columns: (1fr, 1fr,1fr),
+  align(center)[
+    Nipun S Nair \
+    VIT Vellore \
+  ],
+  align(center)[
+    Anamika \
+    VIT Vellore \
+  ],
+  align(center)[
+    Vishnu P K  \
+    VIT Vellore \
+  ],
+)
 
-#align(center)[
-  #text(1.5em)[TOC and LSTM Based Resource Scheduling]
-]
+
+= Literature Review
+#lorem(100)
+
 
 = Methodology
 This section describes the procedures, tools, and methods used to conduct the research.
@@ -113,7 +149,6 @@ The model was evaluated on a test set of 293 samples, achieving an overall accur
     )
   ],
 ) <confusion_matrix>
-
 
 
 == Algorithm 1 (Base) - Round Robin Simulation
