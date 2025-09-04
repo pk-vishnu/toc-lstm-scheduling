@@ -4,7 +4,8 @@
   header: align(right)[
     TOC and LSTM Based Resource Scheduling
   ], 
-  numbering: "1"
+  numbering: "1",
+  // columns: 2
 )
 #set text(
   font: "New Computer Modern",
@@ -17,31 +18,37 @@
 #set heading(
   numbering:"1.1" 
 )
-#align(center, text(17pt)[
-  *TOC and LSTM Based Resource Scheduling*
-])
-#grid(
-  columns: (1fr, 1fr,1fr),
-  align(center)[
-    Nipun S Nair \
-    VIT Vellore \
-  ],
-  align(center)[
-    Anamika \
-    VIT Vellore \
-  ],
-  align(center)[
-    Vishnu P K  \
-    VIT Vellore \
-  ],
-)
+#place(
+  top + center,
+  float: true,
+  scope: "parent",
+  clearance: 2em,
+)[
+  #align(center, text(17pt)[
+    *TOC and LSTM Based Resource Scheduling*
+  ])
+  #grid(
+    columns: (1fr, 1fr,1fr),
+    align(center)[
+      Nipun S Nair \
+      VIT Vellore \
+    ],
+    align(center)[
+      Anamika \
+      VIT Vellore \
+    ],
+    align(center)[
+      Vishnu P K  \
+      VIT Vellore \
+    ],
+  )
 
-#align(center)[
-  #set par(justify: false)
-  *Abstract* \
-  #lorem(80)
+  #align(center)[
+    #set par(justify: false)
+    *Abstract* \
+    #lorem(80)
+  ]
 ]
-
 
 = Literature Review
 #lorem(100)
@@ -118,7 +125,11 @@ $ "bottleneck" = cases(
 )<syntheticData>
 
 === Training Model
-We train the LSTM model using the scikit learn library with a train test split of 80:20.
+To identify potential bottlenecks, we trained a Long-Short-Term Memory neural network, as it is well suited for learning patterns and dependencies in time series data.
+
+To capture temporal patterns, the continuous time series data for each server was transformed into overlapping sequences of windows of size 20 timesteps, with each window serving as an input sequence and the following timestep's bottleneck status as the label (1/0). This information allows the model to learn the patterns leading up to a bottleneck.
+
+The dataset was then split into training and test sets and a MinMax scaler was fit only on the training data and applied to both the sets. Finally we trained a recurrent neural network with an LSTM layer followed by dense layers optimized using binary cross-entropy loss, to classify whether a bottleneck would occur in the next timestep, given the previous 20 timesteps.
 
 === Evaluation
 The model was evaluated on a test set of 293 samples, achieving an overall accuracy of 89%. The detailed performance metrics from the classification report are presented below.
@@ -156,6 +167,17 @@ The model was evaluated on a test set of 293 samples, achieving an overall accur
   ],
 ) <confusion_matrix>
 
-
 == Algorithm 1 (Base) - Round Robin Simulation
+
+
+
+== Algorithm 2 - Round Robin with LSTM bottleneck prediction
+
+
+
+== Algorithm 3 - Theory of Constraints with Fitness Calculation
+  
+  
+  
+== Algorithm 4 - Theory of Constraints with LSTM Bottleneck Prediction
 
