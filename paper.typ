@@ -38,7 +38,7 @@
       VIT Vellore \
     ],
     align(center)[
-      Vishnu P K  \
+      Vishnu P K  \ 
       VIT Vellore \
     ],
   )
@@ -51,8 +51,7 @@
 ]
 
 = Literature Review
-#lorem(100)
-
+Chang et al. @Chang2017ApplyingTO applied a TOC-Based approach to address memory allocation in cloud storage, which uses market information to build a rolling forecast. This demonstrates that TOC principles can be extended to resource scheduling problems in dynamic environments.
 
 = Methodology
 This section describes the procedures, tools, and methods used to conduct the research.
@@ -178,6 +177,7 @@ The model was evaluated on a test set of 293 samples, achieving an overall accur
 == Algorithm 3 - Theory of Constraints with Fitness Calculation
   
   
-  
 == Algorithm 4 - Theory of Constraints with LSTM Bottleneck Prediction
 
+
+#bibliography("refs.bib", title: "References")
