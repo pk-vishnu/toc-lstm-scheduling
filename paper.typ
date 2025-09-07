@@ -175,8 +175,6 @@ Our *resource aware* algorithm performs two crucial checks to make sure there wi
 
 If the designated server fails these checks, the algorithm continues its cyclical search until an adequate server is found. If no server in the system can accept the task, it is rejected.
 
-// This combined section replaces the two separate sections in your paper.
-
 === Algorithm Steps
 
 Let $S$ be the set of $N$ servers, indexed as $S = \{s_0, s_1, ..., s_(N-1)\}$. Let $I_"last"$ be the index of the server that received the previous task. The scheduling process for each new incoming task, $J_"new"$, is executed as follows:
