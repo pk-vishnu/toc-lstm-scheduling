@@ -167,17 +167,128 @@ The model was evaluated on a test set of 293 samples, achieving an overall accur
 ) <confusion_matrix>
 
 == Algorithm 1 (Base) - Round Robin Simulation
+The core principle of Round Robin is to achieve fairness and prevent starvation by distributing tasks in a simple, cyclical sequence by employing a stateless, turn-based approach. It maintains a pointer to the last server that received a task and assigns the next incoming task to the subsequent server in the sequence.
+
+Our *resource aware* algorithm performs two crucial checks to make sure there will be no queue overloads or system failure due to capacity overloads.
+1.  *Queue Capacity Check:* The server's task queue must not be full.
+2.  *Resource Availability Check:* The server must have sufficient free CPU and network capacity to begin processing the specific task at that moment.
+
+If the designated server fails these checks, the algorithm continues its cyclical search until an adequate server is found. If no server in the system can accept the task, it is rejected.
+
+=== Algorithm Steps
+
+Let $S$ be the set of $N$ servers, indexed as $S = \{s_0, s_1, ..., s_(N-1)\}$. Let $I_"last"$ be the index of the server that received the previous task. The scheduling process for each new incoming task, $J_"new"$, is executed as follows:
+
++ *Initialization:* The algorithm identifies the starting index for its search, $I_"start"$, based on the last server to receive a task:
+  $
+    I_"start" = (I_"last" + 1) mod N
+  $
+
++ *Cyclical Search:* The algorithm iterates through all active servers $s_k$ in a circular order for $N$ steps, starting from the server at index $I_"start"$.
+
++ *Eligibility Check:* For each candidate server $s_k$, the algorithm determines its eligibility by evaluating two boolean conditions. The task, $J_"new"$, arrives with a set of resource demands $D = \{D_"cpu", D_"net_in", D_"net_out"\}$. The state of server $s_k$ at time $t$ is defined by its queue length $Q_(s_k)(t)$ and its available capacities for each resource $r in {"cpu", "net_in", "net_out"}$, denoted $C_(s_k, "avail")^r(t)$.
+
+  1.  *The Queue Capacity Condition*, $"Accept"_Q(s_k)$, must be true:
+      $
+        "Accept"_Q(s_k) = [ Q_(s_k)(t) < Q_"max" ]
+      $
+      where $[.]$ is the Iverson bracket.
+
+  2.  *The Resource Availability Condition*, $"Accept"_R(s_k, J_"new")$, must also be true:
+      $
+        "Accept"_R(s_k, J_"new") = [D_"cpu" <= C_(s_k, "avail")^"cpu"(t)] and [D_"net_in" <= C_(s_k, "avail")^"net_in"(t)] and [D_"net_out" <= C_(s_k, "avail")^"net_out"(t)]
+      $
+
++ *Assignment or Rejection:* The first server $s_k$ in the sequence for which both conditions are met is selected as the target server, $S_"target"$.
+  $
+    S_"target" = s_k quad "where" quad "Accept"_Q(s_k) and "Accept"_R(s_k, J_"new")
+  $
+  Upon successful assignment, the index $I_"last"$ is updated to $k$, and the search terminates. If the algorithm completes a full cycle and no server satisfies both conditions, the task $J_"new"$ is rejected, constituting an SLA violation.
 
 
+== Algorithm 2 - Theory of Constraints Simulation
+  This algorithm provides a practical implementation of TOC's *Drum-Buffer-Rope (DBR)* methodology for a parallel, dynamic server environment.
 
-== Algorithm 2 - Round Robin with LSTM bottleneck prediction
+- *The Drum:* The system's identified constraint, whose processing rate dictates the optimal rate at which new work should be introduced.
+- *The Buffer:* A small, managed queue of tasks placed before each resource. The buffer in front of the constraint is the most critical, as it must ensure the constraint is never idle due to a lack of work.
+- *The Rope:* A signaling mechanism that links the constraint's buffer back to the system's entry point. It authorizes the release of new work into the system only when the constraint has the capacity to process it, thereby synchronizing the entire system to the pace of its slowest part.
 
+The algorithm is composed of four primary components that map to the Five Focusing Steps of TOC: Constraint Identification, Flow Control (Dispatcher), Task Assignment, and System Scaling.
 
+===  Algorithm Steps
 
-== Algorithm 3 - Theory of Constraints with Fitness Calculation
-  
-  
-== Algorithm 4 - Theory of Constraints with LSTM Bottleneck Prediction
+Let $S$ be the set of all servers. At any time $t$, the set of active servers is denoted by $S_"active"(t) subset.eq S$. Each server $s in S$ has a maximum CPU capacity $C_(s,"cpu")$ and network capacity $C_(s,"net")$.
+==== Constraint Identification (Identify)
+
+The first step is to dynamically and continuously identify the system's primary constraint. Instantaneous resource utilization is often volatile; therefore, a smoothing function is required to identify the most persistently loaded resource. We employ an *Exponentially Weighted Moving Average (EWMA)* for this purpose.
+
+Let $U_(s,r)(t)$ be the instantaneous utilization of a resource $r in {"cpu", "net"}$ on a server $s$ at time $t$. The utilization is a normalized value where $0 <= U <= 1$.
+
+The smoothed utilization, $U.bar_(s,r)(t)$, is calculated recursively:
+$
+  U.bar_(s,r)(t) = (alpha dot U_(s,r)(t)) + ((1 - alpha) dot U.bar_(s,r)(t - Delta t))
+$
+Where:
+- $alpha$ is the smoothing factor ($0 < alpha < 1$). A lower $alpha$ results in a smoother, less volatile trendline.
+- $Delta t$ is the time interval between measurements.
+
+The system constraint at time $t$, denoted $C(t)$, is the specific resource $(s, r)$ with the highest smoothed utilization across all active servers.
+$
+  C(t) = op("arg""max")_(s in S_"active"(t), r in {"cpu", "net"}) { U.bar_(s,r)(t) }
+$
+This identification process runs at a fixed interval, `CONSTRAINT_CHECK_INTERVAL`, to adapt to changing system loads.
+
+==== Flow Control via Dispatcher (Exploit & Subordinate)
+
+The core of the DBR implementation is a centralized *Dispatcher* that acts as the "Rope." It manages a central priority queue of incoming tasks, $B_"central"$, and only releases work into the system based on the state of the identified constraint, $C(t)$.
+
+Let $C_s(t)$ be the server component of the constraint $C(t)$. Let $Q_s(t)$ be the length of the local buffer (queue) of server $s$ at time $t$, and let $Q_"max"$ be the maximum configured size of this buffer.
+
+The *Rope Condition*, $"Release"(t)$, is a boolean function that determines if a new task should be released from $B_"central"$:
+$
+  "Release"(t) = [Q_(C_s(t))(t) < Q_"max"]
+$
+This condition ensures that a new task is only introduced into the system when the constraint's buffer has capacity. This prevents the accumulation of excessive Work-in-Process (WIP) and paces the entire system to its bottleneck. If $"Release"(t)$ is false, no tasks are dispatched, and they remain in the managed, prioritized central buffer.
+
+==== Task Assignment (Subordinate)
+
+When the Rope Condition $"Release"(t)$ is met, the highest-priority task, $J_"next"$, is selected from the central buffer:
+$
+  J_"next" = op("arg""min")_(j in B_"central") { P(j) }
+$
+where $P(j)$ is the priority value of task $j$ (lower is higher).
+
+This task must then be assigned to an active server. This is a subordinate decision, designed to efficiently utilize non-constraint resources without disturbing the system's flow. The target server, $S_"target"$, is selected from the set of available servers, $S_"avail"(t)$, by finding the server with the smallest local buffer.
+
+The set of available servers is defined as:
+$
+  S_"avail"(t) = { s in S_"active"(t) | Q_s(t) < Q_"max" }
+$
+The target server is then chosen by:
+$
+  S_"target" = op("arg""min")_(s in S_"avail"(t)) { Q_s(t) }
+$
+This ensures the released task is routed to the most idle part of the system, minimizing its local wait time and keeping non-constraint resources productive.
+
+==== System Scaling (Elevate)
+
+The final component is the autoscaler, which implements the "Elevate the Constraint" step. It modifies the size of the active server set, $abs(S_"active"(t))$.
+
+Let $theta_"up"$ be the scale-up threshold and $theta_"down"$ be the scale-down threshold. Let $N(t) = abs(S_"active"(t))$ be the number of active servers.
+
+*Scale-Up Condition:* The decision to scale up is based solely on the status of the constraint. If the smoothed utilization of the constraint resource exceeds the threshold, a new server is activated.
+$
+  "ScaleUp"(t) = [U.bar_(C(t))(t) > theta_"up"] and [N(t) < N_"max"]
+$
+This ensures that capacity is added precisely where it is needed to relieve the system's bottleneck.
+
+*Scale-Down Condition:* The decision to scale down is based on overall system idleness. Let $U.bar_"sys"(t)$ be the average CPU utilization across all active servers. To prevent premature scaling during the initial warm-up phase, a time condition $T_"warmup"$ is included.
+$
+  "ScaleDown"(t) = [t > T_"warmup"] and [U.bar_"sys"(t) < theta_"down"] and [N(t) > N_"min"]
+$
+This allows the system to conserve resources when the overall demand is low, without being triggered by the intentionally low utilization of non-constraint servers during periods of high load.
+
+== Algorithm 3 - Theory of Constraints with LSTM Bottleneck Prediction
 
 
 #bibliography("refs.bib", title: "References")
