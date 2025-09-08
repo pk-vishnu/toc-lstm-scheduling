@@ -205,6 +205,11 @@ Let $S$ be the set of $N$ servers, indexed as $S = \{s_0, s_1, ..., s_(N-1)\}$. 
   $
   Upon successful assignment, the index $I_"last"$ is updated to $k$, and the search terminates. If the algorithm completes a full cycle and no server satisfies both conditions, the task $J_"new"$ is rejected, constituting an SLA violation.
 
+=== Architecture
+#figure(
+  image("/TrainingLSTM/RR_architecture.png"),
+  caption: "Architecture of Round Robin Scheduler"
+)<RRarchitecture>
 
 == Algorithm 2 - Theory of Constraints Simulation
   This algorithm provides a practical implementation of TOC's *Drum-Buffer-Rope (DBR)* methodology for a parallel, dynamic server environment.
@@ -288,6 +293,11 @@ $
 $
 This allows the system to conserve resources when the overall demand is low, without being triggered by the intentionally low utilization of non-constraint servers during periods of high load.
 
+=== Architecture
+#figure(
+  image("/TrainingLSTM/TOC_architecture.png"),
+  caption: "Architecture of Theory of Constraints Scheduler"
+)<TOCarchitecture>
 == Algorithm 3 - Theory of Constraints with LSTM Bottleneck Prediction
 
 
