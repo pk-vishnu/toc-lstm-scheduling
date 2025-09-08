@@ -1,9 +1,7 @@
 #set page(
   paper: "us-letter",
-  margin: (x:2.8cm, y:2.6cm),
-  header: align(right)[
-    TOC and LSTM Based Resource Scheduling
-  ], 
+  margin: (x:1.8cm, y:1.6cm),
+  header: context if here().page()==1{""} else {align(right)[TOC and LSTM Based Resource Scheduling]},
   numbering: "1",
   // columns: 2
 )
