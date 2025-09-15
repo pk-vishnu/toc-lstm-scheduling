@@ -211,12 +211,12 @@ Where:
 Gaussian noise is then added to these base values to simulate the variability of real-world monitoring data.
 
 ==== Queue Length Simulation
-A new key feature, `q_len`, is introduced to represent the number of tasks waiting in a server's queue. Its length is simulated to be strongly correlated with the server's current CPU usage, reflecting the real-world behavior where high CPU load leads to a backlog of tasks.
+`q_len` represents the number of tasks waiting in a server's queue. Its length is simulated to be strongly correlated with the server's current CPU usage, reflecting the real-world behavior where high CPU load leads to a backlog of tasks.
 
 $ "q_len" = "clip"(("cpu" / 10) dot ("MAX_QUEUE_LEN" / 10) + cal(N)(0, 1.5), 0, "MAX_QUEUE_LEN") $
 
 ==== Bottleneck Label Definition
-The definition of a bottleneck has been critically updated. Instead of being based on high resource utilization, a bottleneck is now defined as a state where the server's task queue is almost full. This predictive approach aims to identify conditions that would cause a load balancer to stop dispatching new tasks to that server.
+Instead of being based on just high resource utilization, a bottleneck is defined as a state where the server's task queue is almost full. This predictive approach aims to identify conditions that would cause a load balancer to stop dispatching new tasks to that server.
 
 A binary bottleneck label is assigned as follows:
 
