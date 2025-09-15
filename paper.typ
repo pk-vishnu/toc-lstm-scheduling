@@ -175,7 +175,7 @@ If the designated server fails these checks, the algorithm continues its cyclica
 
 === Algorithm Steps
 
-Let $S$ be the set of $N$ servers, indexed as $S = \{s_0, s_1, ..., s_(N-1)\}$. Let $I_"last"$ be the index of the server that received the previous task. The scheduling process for each new incoming task, $J_"new"$, is executed as follows:
+Let $bb(S)$ be the set of $N$ servers, indexed as $bb(S) = \{s_0, s_1, ..., s_(N-1)\}$. Let $I_"last"$ be the index of the server that received the previous task. The scheduling process for each new incoming task, $J_"new"$, is executed as follows:
 
 + *Initialization:* The algorithm identifies the starting index for its search, $I_"start"$, based on the last server to receive a task:
   $
@@ -184,7 +184,7 @@ Let $S$ be the set of $N$ servers, indexed as $S = \{s_0, s_1, ..., s_(N-1)\}$. 
 
 + *Cyclical Search:* The algorithm iterates through all active servers $s_k$ in a circular order for $N$ steps, starting from the server at index $I_"start"$.
 
-+ *Eligibility Check:* For each candidate server $s_k$, the algorithm determines its eligibility by evaluating two boolean conditions. The task, $J_"new"$, arrives with a set of resource demands $D = \{D_"cpu", D_"net_in", D_"net_out"\}$. The state of server $s_k$ at time $t$ is defined by its queue length $Q_(s_k)(t)$ and its available capacities for each resource $r in {"cpu", "net_in", "net_out"}$, denoted $C_(s_k, "avail")^r(t)$.
++ *Eligibility Check:* For each candidate server $s_k$, the algorithm determines its eligibility by evaluating two boolean conditions. The task, $J_"new"$, arrives with a set of resource demands $D = \{D_"cpu", D_"net_in", D_"net_out"\}$. The state of server $s_k$ at time $t$ is defined by its queue length $Q_(s_k)(t)$ and its available capacities for each resource $r in {"cpu", "net_in", "net_out"}$, denoted $C_"avail"^r (s_k,t)$.
 
   1.  *The Queue Capacity Condition*, $"Accept"_Q(s_k)$, must be true:
       $
@@ -194,15 +194,20 @@ Let $S$ be the set of $N$ servers, indexed as $S = \{s_0, s_1, ..., s_(N-1)\}$. 
 
   2.  *The Resource Availability Condition*, $"Accept"_R(s_k, J_"new")$, must also be true:
       $
-        "Accept"_R(s_k, J_"new") = [D_"cpu" <= C_(s_k, "avail")^"cpu"(t)] and [D_"net_in" <= C_(s_k, "avail")^"net_in"(t)] and [D_"net_out" <= C_(s_k, "avail")^"net_out"(t)]
+        "Accept"_R(s_k, J_"new") = [D_"cpu" <= C_"avail"^"cpu" (s_k,t)] and [D_"net_in" <= C_"avail"^"net_in" (s_k,t)] and [D_"net_out" <= C_"avail"^"net_out" (s_k, t)]
       $
 
-+ *Assignment or Rejection:* The first server $s_k$ in the sequence for which both conditions are met is selected as the target server, $S_"target"$.
++ *Assignment or Rejection:* The first server $s_k$ in the sequence for which both conditions are met is selected as the target server, $bb(S)_"target"$.
   $
-    S_"target" = s_k quad "where" quad "Accept"_Q(s_k) and "Accept"_R(s_k, J_"new")
+    bb(S)_"target" = s_k quad "where" quad "Accept"_Q(s_k) and "Accept"_R(s_k, J_"new")
   $
   Upon successful assignment, the index $I_"last"$ is updated to $k$, and the search terminates. If the algorithm completes a full cycle and no server satisfies both conditions, the task $J_"new"$ is rejected, constituting an SLA violation.
 
+=== Architecture
+#figure(
+  image("/TrainingLSTM/RR_architecture.png"),
+  caption: "Architecture of Round Robin Scheduler"
+)<RRarchitecture>
 
 == Algorithm 2 - Theory of Constraints Simulation
   This algorithm provides a practical implementation of TOC's *Drum-Buffer-Rope (DBR)* methodology for a parallel, dynamic server environment.
@@ -215,16 +220,16 @@ The algorithm is composed of four primary components that map to the Five Focusi
 
 ===  Algorithm Steps
 
-Let $S$ be the set of all servers. At any time $t$, the set of active servers is denoted by $S_"active"(t) subset.eq S$. Each server $s in S$ has a maximum CPU capacity $C_(s,"cpu")$ and network capacity $C_(s,"net")$.
+Let $bb(S)$ be the set of all servers. At any time $t$, the set of active servers is denoted by $bb(S)_"active"(t) subset.eq bb(S)$. Each server $s in bb(S)$ has a maximum CPU capacity $C_(s,"cpu")$ and network capacity $C_(s,"net")$.
 ==== Constraint Identification (Identify)
 
 The first step is to dynamically and continuously identify the system's primary constraint. Instantaneous resource utilization is often volatile; therefore, a smoothing function is required to identify the most persistently loaded resource. We employ an *Exponentially Weighted Moving Average (EWMA)* for this purpose.
 
 Let $U_(s,r)(t)$ be the instantaneous utilization of a resource $r in {"cpu", "net"}$ on a server $s$ at time $t$. The utilization is a normalized value where $0 <= U <= 1$.
 
-The smoothed utilization, $U.bar_(s,r)(t)$, is calculated recursively:
+The smoothed utilization, $#overline("U")_(s,r)(t)$, is calculated recursively:
 $
-  U.bar_(s,r)(t) = (alpha dot U_(s,r)(t)) + ((1 - alpha) dot U.bar_(s,r)(t - Delta t))
+  #overline("U")_(s,r)(t) = (alpha dot U_(s,r)(t)) + ((1 - alpha) dot #overline("U")_(s,r)(t - Delta t))
 $
 Where:
 - $alpha$ is the smoothing factor ($0 < alpha < 1$). A lower $alpha$ results in a smoother, less volatile trendline.
@@ -232,7 +237,7 @@ Where:
 
 The system constraint at time $t$, denoted $C(t)$, is the specific resource $(s, r)$ with the highest smoothed utilization across all active servers.
 $
-  C(t) = op("arg""max")_(s in S_"active"(t), r in {"cpu", "net"}) { U.bar_(s,r)(t) }
+  C(t) = op("argmax")_(s in S_"active"(t), r in {"cpu", "net"}) { #overline("U")_(s,r)(t) }
 $
 This identification process runs at a fixed interval, `CONSTRAINT_CHECK_INTERVAL`, to adapt to changing system loads.
 
@@ -252,41 +257,120 @@ This condition ensures that a new task is only introduced into the system when t
 
 When the Rope Condition $"Release"(t)$ is met, the highest-priority task, $J_"next"$, is selected from the central buffer:
 $
-  J_"next" = op("arg""min")_(j in B_"central") { P(j) }
+  J_"next" = op("argmin")_(j in B_"central") { P(j) }
 $
 where $P(j)$ is the priority value of task $j$ (lower is higher).
 
-This task must then be assigned to an active server. This is a subordinate decision, designed to efficiently utilize non-constraint resources without disturbing the system's flow. The target server, $S_"target"$, is selected from the set of available servers, $S_"avail"(t)$, by finding the server with the smallest local buffer.
+This task must then be assigned to an active server. This is a subordinate decision, designed to efficiently utilize non-constraint resources without disturbing the system's flow. The target server, $bb(S)_"target"$, is selected from the set of available servers, $bb(S)_"avail" (t)$, by finding the server with the smallest local buffer.
 
 The set of available servers is defined as:
 $
-  S_"avail"(t) = { s in S_"active"(t) | Q_s(t) < Q_"max" }
+  bb(S)_"avail" (t) = { s in bb(S)_"active" (t) | Q_s (t) < Q_"max" }
 $
 The target server is then chosen by:
 $
-  S_"target" = op("arg""min")_(s in S_"avail"(t)) { Q_s(t) }
+  bb(S)_"target" = op("argmin")_(s in bb(S)_"avail" (t)) { Q_s (t) }
 $
 This ensures the released task is routed to the most idle part of the system, minimizing its local wait time and keeping non-constraint resources productive.
 
 ==== System Scaling (Elevate)
 
-The final component is the autoscaler, which implements the "Elevate the Constraint" step. It modifies the size of the active server set, $abs(S_"active"(t))$.
+The final component is the autoscaler, which implements the "Elevate the Constraint" step. It modifies the size of the active server set, $abs(bb(S)_"active" (t))$.
 
-Let $theta_"up"$ be the scale-up threshold and $theta_"down"$ be the scale-down threshold. Let $N(t) = abs(S_"active"(t))$ be the number of active servers.
+Let $theta_"up"$ be the scale-up threshold and $theta_"down"$ be the scale-down threshold. Let $N(t) = abs(bb(S)_"active" (t))$ be the number of active servers.
 
 *Scale-Up Condition:* The decision to scale up is based solely on the status of the constraint. If the smoothed utilization of the constraint resource exceeds the threshold, a new server is activated.
 $
-  "ScaleUp"(t) = [U.bar_(C(t))(t) > theta_"up"] and [N(t) < N_"max"]
+  "ScaleUp"(t) = [#overline("U")_(C(t))(t) > theta_"up"] and [N(t) < N_"max"]
 $
 This ensures that capacity is added precisely where it is needed to relieve the system's bottleneck.
 
 *Scale-Down Condition:* The decision to scale down is based on overall system idleness. Let $U.bar_"sys"(t)$ be the average CPU utilization across all active servers. To prevent premature scaling during the initial warm-up phase, a time condition $T_"warmup"$ is included.
 $
-  "ScaleDown"(t) = [t > T_"warmup"] and [U.bar_"sys"(t) < theta_"down"] and [N(t) > N_"min"]
+  "ScaleDown"(t) = [t > T_"warmup"] and [#overline("U")_"sys"(t) < theta_"down"] and [N(t) > N_"min"]
 $
 This allows the system to conserve resources when the overall demand is low, without being triggered by the intentionally low utilization of non-constraint servers during periods of high load.
 
+=== Architecture
+#figure(
+  image("/TrainingLSTM/TOC_architecture.png"),
+  caption: "Architecture of Theory of Constraints Scheduler"
+)<TOCarchitecture>
 == Algorithm 3 - Theory of Constraints with LSTM Bottleneck Prediction
 
+The final algorithm represents the synthesis of the preceding methodologies, integrating the predictive capabilities of the trained LSTM model into the TOC framework. This creates a proactive, intelligent scheduling system that anticipates bottlenecks rather than merely reacting to them.
 
+
+=== Algorithm Steps
+
+The algorithm's components are refactored to incorporate the predictive model. The *ConstraintDetector* is now AI-driven, and its output directly influences the *Dispatcher* and the *Autoscaler*.
+
+==== Predictive Constraint Identification
+
+The reactive, utilization-based constraint identification is replaced by a predictive process that leverages the trained LSTM model. This component's goal is to forecast which server is most likely to become a bottleneck in the near future.
+
+Let $s_i$ be an active server. At time $t$, its state over the last $W$ timesteps (the `WINDOW_SIZE`) is represented by a feature matrix $X_(s_i)(t) in RR^(W times F)$, where $F$ is the number of features (CPU, Queue Length, Network In, Network Out).
+
+1.  *Feature Scaling:* The raw feature matrix $X_(s_i)(t)$ is normalized using the pre-trained scaler function, $g_"scaler"$:
+    $
+      hat(X)_s_i (t) = g_"scaler" (X_(s_i)(t))
+    $
+
+2.  *Inference:* The normalized feature matrix is fed into the trained LSTM model, $f_"LSTM"$, which outputs a bottleneck probability score, $P_"bottleneck"$.
+    $
+      P_"bottleneck"(s_i, t) = f_"LSTM"(hat(X)_(s_i)(t))
+    $
+
+The system's predicted constraint at time $t$, $C_p (t)$, is the server with the highest probability score.
+  $
+    C_p (t) = op("argmax")(s_i in bb(S)_("active")(t)) { P_"bottleneck"(s_i, t)}
+  $
+
+==== Task Dispatching via Constraint Avoidance
+
+The *Dispatcher* logic is inverted from the DBR model. Instead of subordinating to the constraint's pace, it actively works around the predicted constraint to prevent pile-ups.
+
+For an incoming task $J_"new"$, the target server, $bb(S)_"target"$, is selected as follows:
+
+1.  *Define the Candidate Pool:* First, a set of eligible, non-constraint servers, $bb(S)_("eligible")(t)$, is created.
+    $
+      bb(S)_"eligible"(t) = {s in bb(S)_"active"(t) | s != C_p (t) and Q_s (t) < Q_"max" }
+    $
+
+2.  *Primary Assignment:* If the eligible pool is not empty, the task is assigned to the server with the minimum queue length within that pool.
+    $
+      bb(S)_"target" = op("argmin")_(s in bb(S)_"eligible" (t)) { Q_s (t) }
+    $
+
+3.  *Fallback Assignment:* If, and only if, the eligible pool is empty (meaning all non-constraint servers are at maximum capacity), the system will attempt to assign the task to the constraint server, $C_p (t)$, provided it has queue space. This prevents a total system stall when under extreme load.
+
+==== Hybrid System Scaling
+
+The autoscaler is enhanced with a hybrid proactive/reactive policy to make it both intelligent and resilient.
+
+Let $P_c (t)$ be the bottleneck score of the predicted constraint server, $C_p (t)$. Let $U_c (t)$ be the *current* maximum resource utilization (CPU or Network) of that same server. The scale-up decision is triggered by either a proactive or a reactive condition.
+
+1.  *Proactive Trigger (AI-Driven):* Scale up if the AI's confidence in an impending bottleneck is high.
+    $
+      "Trigger"_"proactive" = [ P_c (t) > theta_"up_prob" ]
+    $
+
+2.  *Reactive Trigger (Failsafe):* Scale up if the predicted constraint is *already* in a danger zone, even if the AI's score is not high. This protects against sudden, unpredicted load spikes.
+    $
+      "Trigger"_"reactive" = [ U_c (t) > theta_"danger" ]
+    $
+
+The final scale-up condition is a logical OR of these two triggers:
+$
+  "ScaleUp"(t) = ("Trigger"_"proactive" or "Trigger"_"reactive") and [N(t) < N_"max"]
+$
+where $N(t)$ denotes the number of active servers at time $t$, and $N_"max"$ is the maximum configured server limit for the system.
+
+The scale-down logic remains unchanged from Algorithm 2, providing stability by only removing resources when the entire system is demonstrably idle.
+
+=== Architecture
+#figure(
+  image("/TrainingLSTM/TOC_AI_architecture.png"),
+  caption: "Architecture of AI driven Theory of Constraints Scheduler"
+)<TOCAIarchitecture>
 #bibliography("refs.bib", title: "References")
