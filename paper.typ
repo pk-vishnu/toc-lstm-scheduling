@@ -54,13 +54,123 @@ Chang et al. @Chang2017ApplyingTO applied a TOC-Based approach to address memory
 = Methodology
 This section describes the procedures, tools, and methods used to conduct the research.
 
+// == Training LSTM Model to predict bottlenecks
+// === Synthetic Data Generation
+// We simulate a realistic time-series dataset representing server resource usage over time. The goal is to generate data that mimics real-world system behavior to train an LSTM model for bottleneck prediction.
+//
+// #figure(
+//   caption: [Simulation Parameters],
+//   kind: table, 
+//   [
+//     #table(
+//       columns: (auto,auto),
+//       align: left,
+//       stroke: 0.4pt,
+//       [*Parameter*], [*Description*],
+//       [NUM_SERVERS], [Number of simulated servers],
+//       [SIM_TIME], [Total simulated duration (in time units)],
+//       [TASK_INTERVAL], [Mean inter-arrival time for new tasks],
+//       [CPU_CAPACITY], [Max CPU Usage (100%)],
+//       [NET_CAPACITY], [Max network bandwidth (100%)],
+//     ) 
+//   ]
+// )<simulation_parameters>
+//
+// ==== Poisson-Based Task Arrival
+// Task arrival times are based on a Poisson process, simulated using the exponential distribution:
+//
+// $ "Interarrival Time" ~ "Exponential"(lambda = 1 / "TASK_INTERVAL") $
+//
+// This introduces realistic irregularity in task arrivals—mimicking user requests, job submissions, or packet arrivals.
+//
+// ==== Time-Varying Resource Usage Patterns
+// We simulate periodic system load using sinusoidal functions to represent diurnal load patterns, cyclic CPU spikes, and network traffic fluctuations.
+//
+// *CPU Usage*
+// $ "cpu_base"(t) = 50 + 40 * sin((2pi t) / "PERIOD") $
+//
+// *Network In/Out*
+// $ "net_base"(t, s) = 30 + 25 * sin((2pi (t + s * 10)) / "PERIOD") $
+//
+// Where:
+// - $t$: current timestamp
+// - $s$: server index (adds phase shift between servers)
+// - `PERIOD`: defines workload cycle length (e.g. peaks every 100 time units)
+//
+// ==== Gaussian Noise for Realism
+// We inject Gaussian noise to simulate sensor or monitoring variability. This produces "wobble" on top of clean trends, similar to real monitoring data.
+//
+// $ "cpu" = "clip"("cpu_base" + cal(N)(0, 10), 0, 100) $
+//
+// $ "net_in", "net_out" = "clip"("net_base" + cal(N)(0, 5), 0, 100) $
+//
+// ==== Scheduled Bottlenecks
+// At specific intervals (e.g., for $t = 250$ to $260$ on Server 1), we introduce high-load conditions to ensure predictable bottlenecks for model learning and testing.
+// - CPU, Net In, and Net Out are all set to $>= 90%$.
+//
+// ==== Bottleneck Label Definition
+// A binary bottleneck label is assigned based on an 80% utilization threshold:
+//
+// $ "bottleneck" = cases(
+//   1, "if CPU" >= 80 " or Net In/Out" >= 80,
+//   0, "otherwise"
+// ) $
+//
+// #figure(
+//   image("./TrainingLSTM/SyntheticData.png"),
+//   caption: "Synthetic Data - Compute and Network Resources"
+// )<syntheticData>
+//
+// === Training Model
+// To identify potential bottlenecks, we trained a Long-Short-Term Memory neural network, as it is well suited for learning patterns and dependencies in time series data.
+//
+// To capture temporal patterns, the continuous time series data for each server was transformed into overlapping sequences of windows of size 20 timesteps, with each window serving as an input sequence and the following timestep's bottleneck status as the label (1/0). This information allows the model to learn the patterns leading up to a bottleneck.
+//
+// The dataset was then split into training and test sets and a MinMax scaler was fit only on the training data and applied to both the sets. Finally we trained a recurrent neural network with an LSTM layer followed by dense layers optimized using binary cross-entropy loss, to classify whether a bottleneck would occur in the next timestep, given the previous 20 timesteps.
+//
+// === Evaluation
+// The model was evaluated on a test set of 293 samples, achieving an overall accuracy of 89%. The detailed performance metrics from the classification report are presented below.
+// #figure(
+//   caption: [Classification Report],
+//   kind: table,
+//   [
+//     #table(
+//       columns: 5,
+//       align: (center, center, center, center, center),
+//       stroke: 0.4pt,
+//       [], [*Precision*], [*Recall*], [*F1-Score*], [*Support*],
+//       [*No Bottleneck (0)*], [0.94], [0.91], [0.93], [235],
+//       [*Bottleneck (1)*], [0.69], [0.78], [0.73], [58],
+//       [], [], [], [], [],
+//       [*Accuracy*], [], [], [0.89], [293],
+//       [*Macro Avg*], [0.82], [0.85], [0.83], [293],
+//       [*Weighted Avg*], [0.89], [0.89], [0.89], [293],
+//     ) 
+//   ]
+// )<classification_report>
+//
+// #figure(
+//   caption: [Confusion matrix of model predictions.],
+//   kind: table,
+//    [
+//     #table(
+//       columns: (auto, auto, auto),
+//       align: center,
+//       stroke: 0.4pt,
+//       [], [*Predicted: No Bottleneck*], [*Predicted: Bottleneck*],
+//       [*Actual: No Bottleneck*], [215], [20],
+//       [*Actual: Bottleneck*], [13], [45],
+//     )
+//   ],
+// ) <confusion_matrix>
+
 == Training LSTM Model to predict bottlenecks
 === Synthetic Data Generation
-We simulate a realistic time-series dataset representing server resource usage over time. The goal is to generate data that mimics real-world system behavior to train an LSTM model for bottleneck prediction.
+We simulate a realistic time-series dataset representing server resource usage and task queue length over time. The goal is to generate data that mimics real-world system behavior to train an LSTM model for bottleneck prediction, where a bottleneck is defined by a nearly full task queue.
 
 #figure(
   caption: [Simulation Parameters],
-  kind: table, 
+  kind: table,
   [
     #table(
       columns: (auto,auto),
@@ -72,7 +182,8 @@ We simulate a realistic time-series dataset representing server resource usage o
       [TASK_INTERVAL], [Mean inter-arrival time for new tasks],
       [CPU_CAPACITY], [Max CPU Usage (100%)],
       [NET_CAPACITY], [Max network bandwidth (100%)],
-    ) 
+      [MAX_QUEUE_LEN], [The maximum length of the task queue for a server],
+    )
   ]
 )<simulation_parameters>
 
@@ -87,46 +198,44 @@ This introduces realistic irregularity in task arrivals—mimicking user request
 We simulate periodic system load using sinusoidal functions to represent diurnal load patterns, cyclic CPU spikes, and network traffic fluctuations.
 
 *CPU Usage*
-$ "cpu_base"(t) = 50 + 40 * sin((2pi t) / "PERIOD") $
+$ "cpu_base"(t) = 50 + 40 dot sin((2pi t) / "PERIOD") $
 
 *Network In/Out*
-$ "net_base"(t, s) = 30 + 25 * sin((2pi (t + s * 10)) / "PERIOD") $
+$ "net_base"(t, s) = 30 + 25 dot sin((2pi (t + s dot 10)) / "PERIOD") $
 
 Where:
 - $t$: current timestamp
 - $s$: server index (adds phase shift between servers)
 - `PERIOD`: defines workload cycle length (e.g. peaks every 100 time units)
 
-==== Gaussian Noise for Realism
-We inject Gaussian noise to simulate sensor or monitoring variability. This produces "wobble" on top of clean trends, similar to real monitoring data.
+Gaussian noise is then added to these base values to simulate the variability of real-world monitoring data.
 
-$ "cpu" = "clip"("cpu_base" + cal(N)(0, 10), 0, 100) $
+==== Queue Length Simulation
+A new key feature, `q_len`, is introduced to represent the number of tasks waiting in a server's queue. Its length is simulated to be strongly correlated with the server's current CPU usage, reflecting the real-world behavior where high CPU load leads to a backlog of tasks.
 
-$ "net_in", "net_out" = "clip"("net_base" + cal(N)(0, 5), 0, 100) $
-
-==== Scheduled Bottlenecks
-At specific intervals (e.g., for $t = 250$ to $260$ on Server 1), we introduce high-load conditions to ensure predictable bottlenecks for model learning and testing.
-- CPU, Net In, and Net Out are all set to $>= 90%$.
+$ "q_len" = "clip"(("cpu" / 10) dot ("MAX_QUEUE_LEN" / 10) + cal(N)(0, 1.5), 0, "MAX_QUEUE_LEN") $
 
 ==== Bottleneck Label Definition
-A binary bottleneck label is assigned based on an 80% utilization threshold:
+The definition of a bottleneck has been critically updated. Instead of being based on high resource utilization, a bottleneck is now defined as a state where the server's task queue is almost full. This predictive approach aims to identify conditions that would cause a load balancer to stop dispatching new tasks to that server.
+
+A binary bottleneck label is assigned as follows:
 
 $ "bottleneck" = cases(
-  1, "if CPU" >= 80 " or Net In/Out" >= 80,
+  1, "if  q_len" >= "MAX_QUEUE_LEN" - 1,
   0, "otherwise"
 ) $
 
 #figure(
   image("./TrainingLSTM/SyntheticData.png"),
-  caption: "Synthetic Data - Compute and Network Resources"
+  caption: "Synthetic Data - Compute, Network, and Queue Length Metrics"
 )<syntheticData>
 
 === Training Model
-To identify potential bottlenecks, we trained a Long-Short-Term Memory neural network, as it is well suited for learning patterns and dependencies in time series data.
+To identify potential bottlenecks, we trained a Long-Short-Term Memory (LSTM) neural network, which is well-suited for learning patterns and dependencies in time series data.
 
-To capture temporal patterns, the continuous time series data for each server was transformed into overlapping sequences of windows of size 20 timesteps, with each window serving as an input sequence and the following timestep's bottleneck status as the label (1/0). This information allows the model to learn the patterns leading up to a bottleneck.
+The input for the model now consists of four features: `cpu_used`, `q_len`, `network_in`, and `network_out`. To capture temporal patterns, the continuous time-series data for each server was transformed into overlapping sequences (windows) of size 20 timesteps. Each window serves as an input sequence, and the following timestep's bottleneck status (1 for an almost-full queue, 0 otherwise) serves as the label. This structure allows the model to learn the sequence of events that lead to a queue-based bottleneck.
 
-The dataset was then split into training and test sets and a MinMax scaler was fit only on the training data and applied to both the sets. Finally we trained a recurrent neural network with an LSTM layer followed by dense layers optimized using binary cross-entropy loss, to classify whether a bottleneck would occur in the next timestep, given the previous 20 timesteps.
+The dataset was split into training and test sets. A `MinMaxScaler` was fit only on the training data and then applied to both sets to normalize the features. Finally, we trained a recurrent neural network with an LSTM layer (64 units), followed by Dropout layers for regularization and Dense layers. The model was optimized using binary cross-entropy loss to classify whether a bottleneck would occur in the next timestep.
 
 === Evaluation
 The model was evaluated on a test set of 293 samples, achieving an overall accuracy of 89%. The detailed performance metrics from the classification report are presented below.
@@ -172,6 +281,7 @@ Our *resource aware* algorithm performs two crucial checks to make sure there wi
 2.  *Resource Availability Check:* The server must have sufficient free CPU and network capacity to begin processing the specific task at that moment.
 
 If the designated server fails these checks, the algorithm continues its cyclical search until an adequate server is found. If no server in the system can accept the task, it is rejected.
+
 
 === Algorithm Steps
 
