@@ -221,8 +221,8 @@ Instead of being based on just high resource utilization, a bottleneck is define
 A binary bottleneck label is assigned as follows:
 
 $ "bottleneck" = cases(
-  1, "if  q_len" >= "MAX_QUEUE_LEN" - 1,
-  0, "otherwise"
+  1 "if  q_len" >= "MAX_QUEUE_LEN" - 1,
+  0 "otherwise"
 ) $
 
 #figure(
