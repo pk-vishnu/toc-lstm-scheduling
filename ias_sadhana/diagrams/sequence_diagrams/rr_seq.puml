@@ -1,0 +1,32 @@
+@startuml
+title Round Robin Scheduler – Sequence Diagram
+
+actor TaskGenerator
+participant RoundRobinDispatcher
+participant "Server 1" as S1
+participant "Server 2" as S2
+participant "Server 3" as S3
+participant Logger
+
+== Task Arrival ==
+TaskGenerator -> RoundRobinDispatcher : newTask(task)
+
+loop For each incoming task
+    RoundRobinDispatcher -> S1 : checkQueueCapacity()
+    S1 --> RoundRobinDispatcher : OK / Full
+
+    alt Queue Full
+        RoundRobinDispatcher -> S2 : checkQueueCapacity()
+        S2 --> RoundRobinDispatcher : OK / Full
+    end
+
+    alt Server available
+        RoundRobinDispatcher -> S2 : assignTask(task)
+        S2 --> Logger : updateMetrics()
+        Logger --> RoundRobinDispatcher : ack()
+    else All servers busy
+        RoundRobinDispatcher -> Logger : logSlaViolation(task)
+    end
+end
+
+@enduml

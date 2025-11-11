@@ -1,0 +1,40 @@
+@startuml
+title Hybrid AI + TOC Scheduler – Sequence Diagram
+
+actor TaskGenerator
+participant CentralBuffer
+participant AIDetector as "AI Constraint Detector (LSTM)"
+participant Dispatcher
+participant "Server Pool" as Servers
+participant AutoScaler
+participant Logger
+
+== Task Arrival ==
+TaskGenerator -> CentralBuffer : enqueue(task)
+
+== Predictive Constraint Detection ==
+AIDetector -> Servers : collectUsageMetrics(cpu, net, qlen)
+Servers --> AIDetector : sendHistoryWindow()
+AIDetector -> AIDetector : predictBottleneck()
+AIDetector -> Dispatcher : sendPredictedConstraint(Cp)
+
+== Intelligent Dispatch ==
+Dispatcher -> CentralBuffer : getNextTask()
+alt Non-constraint servers available
+    Dispatcher -> Servers : assignTask(task to least-loaded non-constraint)
+    Servers --> Dispatcher : ack()
+else All non-constraint servers full
+    Dispatcher -> Cp : assignTask(task)
+end
+Dispatcher -> Logger : logAssignment()
+
+== Proactive Scaling ==
+AIDetector -> AutoScaler : triggerScale(probability, utilization)
+AutoScaler -> Servers : scaleUp()/scaleDown()
+AutoScaler -> Logger : logScalingEvent()
+
+== Feedback Loops ==
+Logger -> AutoScaler : feedbackPerformance()
+AutoScaler -> AIDetector : updateThresholds()
+
+@enduml

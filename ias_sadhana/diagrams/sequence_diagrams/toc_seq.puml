@@ -1,0 +1,37 @@
+@startuml
+title TOC (Drum–Buffer–Rope) Scheduler – Sequence Diagram
+
+actor TaskGenerator
+participant CentralBuffer
+participant Dispatcher
+participant ConstraintDetector
+participant "Server Pool" as Servers
+participant AutoScaler
+participant Logger
+
+== Task Flow ==
+TaskGenerator -> CentralBuffer : enqueue(task)
+CentralBuffer -> Dispatcher : readyToDispatch()
+
+== Drum–Buffer–Rope Control ==
+Dispatcher -> ConstraintDetector : identifyConstraint()
+ConstraintDetector --> Dispatcher : constraintInfo(C)
+
+alt Rope Condition TRUE
+    Dispatcher -> Servers : assignTask(task)
+    Servers --> Dispatcher : ack()
+else Rope Condition FALSE
+    Dispatcher -> CentralBuffer : holdTask()
+end
+
+== Monitoring & Scaling ==
+Servers -> ConstraintDetector : reportUtilization()
+ConstraintDetector -> AutoScaler : sendConstraintState(C)
+AutoScaler -> Servers : scaleUp() / scaleDown()
+AutoScaler -> Logger : logScalingEvent()
+
+== Feedback Loops ==
+ConstraintDetector --> Dispatcher : constraintUpdate()
+Dispatcher -> Logger : logTaskFlow()
+
+@enduml
